@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='assets/brainwh.svg') }}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Intelligence - AI-Powered Data Science Platform</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.18.0/plotly.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.3.4/axios.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg,#000000 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: block;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-button.active {
+            background-color: #000000;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-black">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-solid fa-brain text-3xl mr-3"></i>
+                    <h1 class="text-2xl font-bold">Data Intelligence</h1>
+                </div>
+                <p class="text-sm opacity-90">AI-Powered Data Science Platform</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-6 py-8">
+        <!-- Data Loading Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl text-black font-semibold mb-4 flex items-center">
+                <i class="fas fa-upload mr-2 text-black"></i>
+                Data Input
+            </h2>
+            
+            <!-- Tab Navigation -->
+            <div class="flex mb-6 border-b">
+                <button onclick="switchTab('file-upload')" class="tab-button px-4 py-2 mr-2 rounded-t-lg bg-gray-200 active">
+                    <i class="fas fa-file-upload mr-2"></i>File Upload
+                </button>
+                <button onclick="switchTab('sql-connect')" class="tab-button px-4 py-2 rounded-t-lg bg-gray-200">
+                    <i class="fas fa-database mr-2"></i>SQL Database
+                </button>
+            </div>
+
+            <!-- File Upload Tab -->
+            <div id="file-upload" class="tab-content active">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-600 mb-4">Drag and drop your CSV or Excel file here, or click to browse</p>
+                    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" class="hidden">
+                    <button onclick="document.getElementById('fileInput').click()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        Choose File
+                    </button>
+                </div>
+                <div id="file-info" class="mt-4 hidden">
+                    <p class="text-sm text-black">Selected: <span id="file-name"></span></p>
+                    <button onclick="uploadFile()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 mt-2">
+                        Upload and Analyze
+                    </button>
+                </div>
+            </div>
+
+            <!-- SQL Connection Tab -->
+            <div id="sql-connect" class="tab-content">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-4">Connection String</label>
+                        <input type="text" id="connectionString" placeholder="database.db" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-4">SQL Query</label>
+                        <textarea id="sqlQuery" rows="3" placeholder="SELECT * FROM table_name LIMIT 1000"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                </div>
+                <button onclick="connectSQL()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 mt-4">
+                    Connect and Load Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading">
+            <div class="bg-black rounded-lg shadow-md p-6 text-center">
+                <i class="fas fa-spinner fa-spin text-4xl text-white mb-4"></i>
+                <p class="text-white">Processing your data...</p>
+            </div>
+        </div>
+
+        <!-- Data Overview -->
+        <div id="data-overview" class="bg-black rounded-lg shadow-md p-6 mb-8 hidden">
+            <h2 class="text-xl text-white font-semibold mb-4 flex items-center">
+                <i class="fas fa-table mr-2 text-green-600"></i>
+                Data Overview
+            </h2>
+            <div id="data-summary"></div>
+        </div>
+
+        <!-- Analysis Dashboard -->
+        <div id="analysis-dashboard" class="hidden">
+            <!-- Control Panel -->
+            <div class="bg-black rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl text-white font-semibold mb-4 flex items-center">
+                    <i class="fas fa-cogs mr-2 text-purple-600"></i>
+                    Analysis Controls
+                </h2>
+                <div class="flex flex-wrap gap-4">
+                    <button onclick="performEDA()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-chart-line mr-2"></i>Exploratory Analysis
+                    </button>
+                    <button onclick="createVisualizations()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                        <i class="fas fa-chart-bar mr-2"></i>Generate Visualizations
+                    </button>
+                    <button onclick="performAdvancedAnalysis()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
+                        <i class="fas fa-brain mr-2"></i>Advanced AI Analysis
+                    </button>
+                    <button onclick="generateWorkflow()" class="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700">
+                        <i class="fas fa-project-diagram mr-2"></i>Generate Workflow
+                    </button>
+                    <button onclick="showMLSection()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-robot mr-2"></i>Build ML Model
+                    </button>
+                    <button onclick="exportReport()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-download mr-2"></i>Export PDF Report
+                    </button>
+                </div>
+            </div>
+
+            <!-- Advanced AI Analysis Results -->
+            <div id="advanced-analysis-results" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-brain mr-2 text-indigo-600"></i>
+                    Advanced AI Analysis
+                </h2>
+                <div id="advanced-analysis-content"></div>
+            </div>
+
+            <!-- Data Science Workflow -->
+            <div id="workflow-section" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-project-diagram mr-2 text-teal-600"></i>
+                    Data Science Workflow
+                </h2>
+                <div id="workflow-content"></div>
+            </div>
+
+            <!-- Data Quality Dashboard -->
+            <div id="data-quality-section" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-shield-alt mr-2 text-orange-600"></i>
+                    Data Quality Assessment
+                </h2>
+                <div id="data-quality-content"></div>
+            </div>
+
+            <!-- EDA Results -->
+            <div id="eda-results" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-search mr-2 text-blue-600"></i>
+                    Exploratory Data Analysis
+                </h2>
+                <div id="eda-content"></div>
+            </div>
+
+            <!-- Visualizations -->
+            <div id="visualizations" class="mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center bg-white rounded-lg shadow-md p-4">
+                    <i class="fas fa-chart-pie mr-2 text-green-600"></i>
+                    Interactive Visualizations
+                </h2>
+                <div id="plots-container" class="grid gap-6"></div>
+            </div>
+
+            <!-- ML Model Section -->
+            <div id="ml-section" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-brain mr-2 text-purple-600"></i>
+                    Machine Learning Model
+                </h2>
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Target Column</label>
+                        <select id="targetColumn" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">Select target column...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Model Type</label>
+                        <select id="modelType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="auto">Auto Detect</option>
+                            <option value="classification">Classification</option>
+                            <option value="regression">Regression</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="buildMLModel()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                    Build and Train Models
+                </button>
+                <div id="ml-results" class="mt-6 hidden"></div>
+            </div>
+
+            <!-- AI Insights -->
+            <div id="ai-insights" class="bg-white rounded-lg shadow-md p-6 hidden">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-lightbulb mr-2 text-yellow-600"></i>
+                    AI-Generated Insights
+                </h2>
+                <div id="insights-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        // Tab switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // File handling
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('file-info').classList.remove('hidden');
+            }
+        });
+
+        // Upload file
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showLoading(true);
+            
+            try {
+                const response = await axios.post('/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    currentData = response.data;
+                    displayDataOverview(response.data);
+                    showAnalysisDashboard();
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Connect to SQL
+        async function connectSQL() {
+            const connectionString = document.getElementById('connectionString').value;
+            const sqlQuery = document.getElementById('sqlQuery').value;
+
+            if (!connectionString || !sqlQuery) {
+                alert('Please provide both connection string and SQL query');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const response = await axios.post('/sql-connect', {
+                    connection_string: connectionString,
+                    query: sqlQuery
+                });
+
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    currentData = response.data;
+                    displayDataOverview(response.data);
+                    showAnalysisDashboard();
+                }
+            } catch (error) {
+                console.error('SQL connection error:', error);
+                alert('SQL connection failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display data overview
+        function displayDataOverview(data) {
+            const summaryDiv = document.getElementById('data-summary');
+            
+            summaryDiv.innerHTML = `
+                <div class="grid md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-blue-800">Dataset Shape</h3>
+                        <p class="text-2xl font-bold text-blue-600">${data.shape[0]} × ${data.shape[1]}</p>
+                        <p class="text-sm text-blue-600">Rows × Columns</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-green-800">Numeric Columns</h3>
+                        <p class="text-2xl font-bold text-green-600">${data.numeric_columns.length}</p>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-yellow-800">Categorical Columns</h3>
+                        <p class="text-2xl font-bold text-yellow-600">${data.categorical_columns.length}</p>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold mb-3 text-white">Column Information</h4>
+                        <div class="max-h-64 overflow-y-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-white sticky top-0">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Column</th>
+                                        <th class="px-3 py-2 text-left">Type</th>
+                                        <th class="px-3 py-2 text-left">Missing</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.columns.map(col => `
+                                        <tr class="border-b">
+                                            <td class="px-3 py-2 font-medium text-white">${col}</td>
+                                            <td class="px-3 py-2 text-white">${data.dtypes[col]}</td>
+                                            <td class="px-3 py-2 ${data.missing_values[col] > 0 ? 'text-red-600' : 'text-green-600'}">
+                                                ${data.missing_values[col]}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-white mb-3">Sample Data</h4>
+                        <div class="max-h-64 overflow-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-white sticky top-0">
+                                    <tr>
+                                        ${data.columns.slice(0, 4).map(col => `<th class="px-2 py-1 text-left">${col}</th>`).join('')}
+                                        ${data.columns.length > 4 ? '<th class="px-2 py-1 text-left">...</th>' : ''}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.sample_data.slice(0, 5).map(row => `
+                                        <tr class="border-b">
+                                            ${data.columns.slice(0, 4).map(col => `<td class="px-2 py-1 text-white">${row[col] !== null && row[col] !== undefined ? row[col] : 'N/A'}</td>`).join('')}
+                                            ${data.columns.length > 4 ? '<td class="px-2 py-1 text-white">...</td>' : ''}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('data-overview').classList.remove('hidden');
+            
+            // Populate target column dropdown
+            const targetSelect = document.getElementById('targetColumn');
+            targetSelect.innerHTML = '<option value="">Select target column...</option>';
+            data.columns.forEach(col => {
+                targetSelect.innerHTML += `<option value="${col}">${col}</option>`;
+            });
+        }
+
+        // Show analysis dashboard
+        function showAnalysisDashboard() {
+            document.getElementById('analysis-dashboard').classList.remove('hidden');
+        }
+
+        // Perform EDA
+        async function performEDA() {
+            showLoading(true);
+            
+            try {
+                const response = await axios.post('/analyze');
+                
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    displayEDAResults(response.data);
+                }
+            } catch (error) {
+                console.error('EDA error:', error);
+                alert('Analysis failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display EDA results
+        function displayEDAResults(data) {
+            const edaDiv = document.getElementById('eda-content');
+            
+            let correlationHtml = '';
+            if (data.correlation_analysis && data.correlation_analysis.high_correlations) {
+                correlationHtml = `
+                    <div class="mb-6">
+                        <h4 class="font-semibold mb-3">High Correlations (|r| > 0.7)</h4>
+                        ${data.correlation_analysis.high_correlations.length > 0 ? `
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                ${data.correlation_analysis.high_correlations.map(corr => `
+                                    <div class="flex justify-between items-center py-2 border-b last:border-b-0">
+                                        <span>${corr.var1} ↔ ${corr.var2}</span>
+                                        <span class="font-bold ${corr.correlation > 0 ? 'text-green-600' : 'text-red-600'}">
+                                            ${corr.correlation.toFixed(3)}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : '<p class="text-gray-600">No high correlations found.</p>'}
+                    </div>
+                `;
+            }
+
+            let distributionHtml = '';
+            if (data.distribution_analysis) {
+                distributionHtml = `
+                    <div class="mb-6">
+                        <h4 class="font-semibold mb-3">Distribution Analysis</h4>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            ${Object.entries(data.distribution_analysis).map(([col, stats]) => `
+                                <div class="bg-gray-50 p-4 rounded-lg">
+                                    <h5 class="font-medium mb-2">${col}</h5>
+                                    <div class="text-sm space-y-1">
+                                        <div>Mean: <span class="font-medium">${stats.mean.toFixed(3)}</span></div>
+                                        <div>Median: <span class="font-medium">${stats.median.toFixed(3)}</span></div>
+                                        <div>Std Dev: <span class="font-medium">${stats.std.toFixed(3)}</span></div>
+                                        <div>Skewness: <span class="font-medium ${Math.abs(stats.skewness) > 1 ? 'text-red-600' : 'text-green-600'}">${stats.skewness.toFixed(3)}</span></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            let insightsHtml = '';
+            if (data.insights && data.insights.length > 0) {
+                insightsHtml = `
+                    <div class="mb-6">
+                        <h4 class="font-semibold mb-3">AI-Generated Insights</h4>
+                        <div class="bg-yellow-50 p-4 rounded-lg">
+                            ${data.insights.map(insight => `
+                                <div class="flex items-start mb-2 last:mb-0">
+                                    <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-1"></i>
+                                    <span class="text-sm">${insight}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            edaDiv.innerHTML = correlationHtml + distributionHtml + insightsHtml;
+            document.getElementById('eda-results').classList.remove('hidden');
+            
+            // Also show insights in the dedicated section
+            if (data.insights) {
+                document.getElementById('insights-content').innerHTML = insightsHtml;
+                document.getElementById('ai-insights').classList.remove('hidden');
+            }
+        }
+
+        // Create visualizations
+        async function createVisualizations() {
+            showLoading(true);
+            
+            try {
+                const response = await axios.post('/visualize');
+                
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    displayVisualizations(response.data);
+                }
+            } catch (error) {
+                console.error('Visualization error:', error);
+                alert('Visualization failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display visualizations
+        function displayVisualizations(plots) {
+            const container = document.getElementById('plots-container');
+            container.innerHTML = '';
+
+            Object.entries(plots).forEach(([plotName, plotData]) => {
+                const plotDiv = document.createElement('div');
+                plotDiv.className = 'bg-white rounded-lg shadow-md p-4';
+                plotDiv.innerHTML = `<div id="plot-${plotName}" style="height: 400px;"></div>`;
+                container.appendChild(plotDiv);
+
+                try {
+                    const plotObj = JSON.parse(plotData);
+                    Plotly.newPlot(`plot-${plotName}`, plotObj.data, plotObj.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                } catch (error) {
+                    console.error('Error creating plot:', error);
+                    plotDiv.innerHTML = '<p class="text-red-600">Error creating visualization</p>';
+                }
+            });
+
+            document.getElementById('visualizations').classList.remove('hidden');
+        }
+
+        // Show ML section
+        function showMLSection() {
+            document.getElementById('ml-section').classList.remove('hidden');
+        }
+
+        // Build ML model
+        async function buildMLModel() {
+            const targetColumn = document.getElementById('targetColumn').value;
+            const modelType = document.getElementById('modelType').value;
+            
+            if (!targetColumn) {
+                alert('Please select a target column');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                const response = await axios.post('/predict', {
+                    target_column: targetColumn,
+                    model_type: modelType
+                });
+                
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    displayMLResults(response.data);
+                }
+            } catch (error) {
+                console.error('ML model building error:', error);
+                alert('Model building failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display ML results
+        function displayMLResults(data) {
+            const resultsDiv = document.getElementById('ml-results');
+            
+            let modelsHtml = '';
+            if (data.models) {
+                modelsHtml = Object.entries(data.models).map(([modelName, results]) => {
+                    if (results.error) {
+                        return `
+                            <div class="bg-red-50 p-4 rounded-lg mb-4">
+                                <h5 class="font-medium text-red-800">${modelName}</h5>
+                                <p class="text-red-600 text-sm">Error: ${results.error}</p>
+                            </div>
+                        `;
+                    }
+
+                    const metricName = data.problem_type === 'classification' ? 'accuracy' : 'r2_score';
+                    const metricValue = results[metricName];
+                    const metricColor = metricValue > 0.8 ? 'text-green-600' : metricValue > 0.6 ? 'text-yellow-600' : 'text-red-600';
+
+                    let featureImportanceHtml = '';
+                    if (results.feature_importance) {
+                        const topFeatures = Object.entries(results.feature_importance)
+                            .sort(([,a], [,b]) => b - a)
+                            .slice(0, 5);
+                        
+                        featureImportanceHtml = `
+                            <div class="mt-3">
+                                <h6 class="font-medium text-sm mb-2">Top Features:</h6>
+                                <div class="space-y-1">
+                                    ${topFeatures.map(([feature, importance]) => `
+                                        <div class="flex justify-between text-sm">
+                                            <span>${feature}</span>
+                                            <span class="font-medium">${importance.toFixed(3)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                            <h5 class="font-medium mb-2">${modelName}</h5>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm">${metricName.toUpperCase()}:</span>
+                                <span class="font-bold ${metricColor}">${metricValue.toFixed(3)}</span>
+                            </div>
+                            ${featureImportanceHtml}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            resultsDiv.innerHTML = `
+                <div class="mb-4">
+                    <h4 class="font-semibold mb-2">Problem Type: <span class="text-blue-600">${data.problem_type}</span></h4>
+                </div>
+                ${modelsHtml}
+            `;
+            
+            resultsDiv.classList.remove('hidden');
+        }
+
+        // Perform advanced AI analysis
+        async function performAdvancedAnalysis() {
+            showLoading(true);
+            
+            try {
+                const response = await axios.post('/advanced-analysis');
+                
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    displayAdvancedAnalysis(response.data);
+                }
+            } catch (error) {
+                console.error('Advanced analysis error:', error);
+                alert('Advanced analysis failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display advanced analysis results
+        function displayAdvancedAnalysis(data) {
+            const contentDiv = document.getElementById('advanced-analysis-content');
+            
+            let html = '<div class="grid md:grid-cols-2 gap-6">';
+            
+            // Data Quality Section
+            if (data.analysis_results && data.analysis_results.data_quality) {
+                const quality = data.analysis_results.data_quality;
+                html += `
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-3 text-indigo-800">Data Quality Score</h4>
+                        <div class="text-center">
+                            <div class="text-4xl font-bold text-indigo-600 mb-2">${quality.summary_score}/100</div>
+                            <div class="text-sm text-indigo-700">Overall Quality Rating</div>
+                        </div>
+                        <div class="mt-4 space-y-2">
+                            <div class="flex justify-between">
+                                <span>Completeness:</span>
+                                <span class="font-medium">${quality.completeness.overall_score.toFixed(1)}%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Duplicates:</span>
+                                <span class="font-medium">${quality.duplicates.percentage}%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Anomaly Detection Section
+            if (data.analysis_results && data.analysis_results.anomaly_detection) {
+                const anomalies = data.analysis_results.anomaly_detection;
+                html += `
+                    <div class="bg-gradient-to-r from-red-50 to-pink-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-3 text-red-800">Anomaly Detection</h4>
+                        <div class="text-center">
+                            <div class="text-4xl font-bold text-red-600 mb-2">${anomalies.anomaly_count || 0}</div>
+                            <div class="text-sm text-red-700">Anomalies Detected</div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="text-sm text-red-600">
+                                ${(anomalies.anomaly_percentage || 0).toFixed(2)}% of data points
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            
+            // Natural Language Insights
+            if (data.natural_language_insights) {
+                html += `
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-3">AI-Generated Insights</h4>
+                        <div class="bg-yellow-50 p-4 rounded-lg">
+                            ${data.natural_language_insights.map(insight => `
+                                <div class="flex items-start mb-2 last:mb-0">
+                                    <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-1 flex-shrink-0"></i>
+                                    <span class="text-sm">${insight}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Clustering Analysis
+            if (data.analysis_results && data.analysis_results.clustering_analysis && data.analysis_results.clustering_analysis.optimal_clusters) {
+                const clustering = data.analysis_results.clustering_analysis;
+                html += `
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-3">Clustering Analysis</h4>
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <div class="mb-3">
+                                <span class="text-sm text-purple-700">Optimal Clusters: </span>
+                                <span class="font-bold text-purple-800">${clustering.optimal_clusters}</span>
+                            </div>
+                            <div class="text-sm text-purple-600">
+                                Silhouette Score: ${clustering.silhouette_score.toFixed(3)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            contentDiv.innerHTML = html;
+            document.getElementById('advanced-analysis-results').classList.remove('hidden');
+        }
+
+        // Generate data science workflow
+        async function generateWorkflow() {
+            showLoading(true);
+            
+            try {
+                const response = await axios.post('/generate-workflow');
+                
+                if (response.data.error) {
+                    alert('Error: ' + response.data.error);
+                } else {
+                    displayWorkflow(response.data.workflow);
+                }
+            } catch (error) {
+                console.error('Workflow generation error:', error);
+                alert('Workflow generation failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display workflow
+        function displayWorkflow(workflow) {
+            const contentDiv = document.getElementById('workflow-content');
+            
+            let html = '';
+            
+            Object.entries(workflow).forEach(([phase, steps]) => {
+                html += `
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-lg mb-3 capitalize text-teal-800">${phase.replace('_', ' ')}</h4>
+                        <div class="space-y-3">
+                `;
+                
+                steps.forEach((step, index) => {
+                    const priorityColor = step.priority === 'high' ? 'red' : step.priority === 'medium' ? 'yellow' : 'gray';
+                    
+                    html += `
+                        <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-teal-500">
+                            <div class="flex justify-between items-start mb-2">
+                                <h5 class="font-medium">${step.step ? `Step ${step.step}: ` : ''}${step.action || step.consideration}</h5>
+                                ${step.priority ? `<span class="text-xs px-2 py-1 rounded bg-${priorityColor}-100 text-${priorityColor}-800">${step.priority}</span>` : ''}
+                            </div>
+                            ${step.code_snippet ? `<code class="text-sm bg-gray-800 text-green-400 p-2 rounded block mt-2">${step.code_snippet}</code>` : ''}
+                            <p class="text-sm text-gray-600 mt-2">${step.purpose || step.impact || ''}</p>
+                        </div>
+                    `;
+                });
+                
+                html += '</div></div>';
+            });
+            
+            contentDiv.innerHTML = html;
+            document.getElementById('workflow-section').classList.remove('hidden');
+        }
+
+        // Export report as PDF
+        async function exportReport() {
+            try {
+                showLoading(true);
+                const response = await axios.post('/export-report', {}, {
+                    responseType: 'blob'
+                });
+                
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'data_intelligence_report.pdf');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+                
+                alert('PDF Report exported successfully!');
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + (error.response?.data?.error || error.message));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Show/hide loading
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.add('active');
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        // Drag and drop functionality
+        const dropZone = document.querySelector('.border-dashed');
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-blue-50');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                document.getElementById('file-name').textContent = files[0].name;
+                document.getElementById('file-info').classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
